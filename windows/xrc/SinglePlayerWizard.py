@@ -82,6 +82,60 @@ class StartPageBase(wx.wizard.PyWizardPage):
 		self.DownloadLink = XRCCTRL(self, "DownloadLink")
 
 
+class LoadPageBase(wx.wizard.PyWizardPage):
+        xrc = os.path.join(location(), "windows", "xrc", 'SinglePlayerWizard.xrc')
+        
+        def PreCreate(self, pre):
+		""" This function is called during the class's initialization.
+		
+		Override it for custom setup before the window is created usually to
+		set additional window styles using SetWindowStyle() and SetExtraStyle()."""
+		pass
+
+	def SetNext(self, next):
+		self.next = next
+	
+	def SetPrev(self, prev):
+		self.prev = prev
+
+	def GetNext(self):
+		return self.next
+
+	def GetPrev(self):
+		return self.prev
+
+	def validate(self):
+		return True
+
+	def __init__(self, parent, *args, **kw):
+                """ Pass an initialized wx.xrc.XmlResource into res """
+		f = os.path.join(os.path.dirname(__file__), self.xrc)
+		res = XmlResourceWithHandlers(f)		
+
+		# Two stage creation (see http://wiki.wxpython.org/index.cgi/TwoStageCreation)
+		pre = wx.wizard.PrePyWizardPage()
+		res.LoadOnPanel(pre, parent, "LoadPage")
+		self.PreCreate(pre)
+		self.PostCreate(pre)
+
+		self.parent = parent
+		self.next = self.prev = None
+		self.skip = False
+
+		self.SetAutoLayout(True)
+		self.Fit()
+		self.Hide()
+
+		# Define variables for the controls
+		self.PageDesc = XRCCTRL(self, "PageDesc")
+                self.Savefile = XRCCTRL(self, "FileLocation")
+                self.LoadButton = XRCCTRL(self, "LoadButton")
+		self.SavefileDesc = XRCCTRL(self, "SavefileDesc")
+                
+                if hasattr(self, "OnLoad"):
+			self.Bind(wx.EVT_BUTTON, self.OnLoad, self.LoadButton)
+
+
 class RulesetPageBase(wx.wizard.PyWizardPage):
 	xrc = os.path.join(location(), "windows", "xrc", 'SinglePlayerWizard.xrc')
 

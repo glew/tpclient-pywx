@@ -286,6 +286,48 @@ player game. Click the link below for a list and installation instructions."""))
 			return self.next
 		return None
 
+class LoadPage(LoadPageBase):
+        def __init__(self, parent, *args, **kw):
+                LoadPageBase.__init__(self, parent, *args, **kw)
+
+                self.PageDesc.SetLabel(_("""\
+Choose a savefile to load a previous game. Leave blank to continue creating a new game."""))
+                self.PageDesc.Wrap(self.PageDesc.GetSize()[0])
+
+        def GetNext(self):
+                next = self.next
+                while next.skip:
+                        next = next.next
+                return next
+
+        def RefreshOpts(self):
+                loadparam = {'savefile': {'default': None, 'commandstring': '', 'type': 'F', 'description': 'Savefile to load.', 'longname': 'Savefile'}}
+                PopulateOpts(loadparam, self, self.LoadOptSizer)
+
+        def OnLoad(self, event):
+                # load savefile
+                if self.Savefile.GetValue():
+                        self.parent.game.load(self.Savefile.GetValue())
+
+                        # show savefile components
+                        self.SavefileDesc.SetLabel("""\
+Loaded file.""")
+
+                        # if no errors, should skip subsequent pages
+                        self.next.skip = True
+                        self.next.next.skip = True
+                        self.next.next.next.skip = True
+                        self.next.next.next.next.skip = True
+                        self.next.next.next.next.next.skip = True
+                        self.next.next.next.next.next.next.skip = True
+                        # else skip false
+                else:
+                        # reset game fields
+
+
+                        self.SavefileDesc.Hide()
+                
+
 class RulesetPage(RulesetPageBase):
 	def __init__(self, parent, *args, **kw):
 		RulesetPageBase.__init__(self, parent, *args, **kw)
@@ -647,6 +689,7 @@ class SinglePlayerWizard(SinglePlayerWizardBase):
 		self.pages = []
 
 		self.AddPage(StartPage(self))
+                self.AddPage(LoadPage(self))
 		self.AddPage(RulesetPage(self))
 		self.AddPage(ServerPage(self))
 		self.AddPage(RulesetOptsPage(self))
@@ -689,7 +732,7 @@ class SinglePlayerWizard(SinglePlayerWizardBase):
 			event.Veto()
 			return
 
-		if isinstance(event.GetPage(), StartPage) and self.game.sname == '':
+		if isinstance(event.GetPage(), LoadPage) and self.game.sname == '':
 			# initialize ruleset selection
 			if len(self.game.rulesets) > 0:
 				event.GetPage().next.Ruleset.SetSelection(0)

@@ -55,6 +55,68 @@
       <growablerows/>
     </object>
   </object>
+  <object class="wxPanel" name="LoadPage" subclass="wxWizardPage">
+    <pos>0,0</pos>
+    <size>400,299</size>
+    <object class="wxFlexGridSizer">
+      <object class="sizeritem">
+        <object class="wxStaticText" name="wxID_STATIC">
+          <label>Load Saved Game</label>
+          <font>
+            <size>14</size>
+            <weight>bold</weight>
+            <family>swiss</family>
+            <face>Sans</face>
+          </font>
+          <style>wxALIGN_CENTRE</style>
+        </object>
+      </object>
+      <object class="sizeritem">
+        <object class="wxStaticLine">
+          <size>300,1</size>
+        </object>
+      </object>
+      <object class="sizeritem">
+        <object class="wxStaticText" name="PageDesc">
+          <size>400,-1</size>
+          <wrap>400</wrap>
+          <style>wxNO_BORDER|wxALIGN_LEFT|wxST_NO_AUTORESIZE</style>
+        </object>
+        <flag>wxEXPAND|wxALIGN_LEFT|wxALIGN_TOP</flag>
+      </object>
+      <object class="sizeritem">
+        <object class="wxTextCtrl" name="FileLocation">
+          <tooltip>Type the absolute path of the savefile.</tooltip>
+          <size>400,-1</size>
+          <option>1</option>
+          <flag>wxEXPAND|wxGROW</flag>
+        </object>
+        <flag></flag>
+        <option></option>
+        <flag>wxEXPAND|wxALIGN_LEFT|wxALIGN_TOP</flag>
+      </object>
+      <object class="sizeritem">
+        <object class="wxButton" name="LoadButton">
+          <label>Load</label>
+          <size>60,-1</size>          
+        </object>
+        <border>5</border>
+        <flag>wxALIGN_RIGHT|wxALIGN_TOP</flag>
+      </object>
+      <object class="sizeritem">
+        <object class="wxStaticText" name="SavefileDesc">
+          <size>400,-1</size>
+          <wrap>400</wrap>
+          <style>wxNO_BORDER|wxALIGN_LEFT|wxST_NO_AUTORESIZE</style>
+        </object>
+        <flag>wxEXPAND|wxALIGN_LEFT|wxALIGN_TOP</flag>
+      </object>
+      <cols>1</cols>
+      <vgap>5</vgap>
+      <growablecols>1</growablecols>
+      <growablerows/>
+    </object>
+  </object>
   <object class="wxPanel" name="RulesetPage" subclass="wxWizardPage">
     <object class="wxFlexGridSizer">
       <object class="sizeritem">
