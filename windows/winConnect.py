@@ -5,6 +5,8 @@ person enter the server/username/password.
 
 # Python imports
 import string
+import os
+import sys
 
 # wxPython Imports
 import wx
@@ -306,26 +308,33 @@ Choose a savefile to load a previous game. Leave blank to continue creating a ne
 
         def OnLoad(self, event):
                 # load savefile
-                if self.Savefile.GetValue():
-                        self.parent.game.load(self.Savefile.GetValue())
-
+                load = self.parent.game.load(self.Savefile.GetValue())
+                # if no errors, should skip subsequent pages
+                if not load:
                         # show savefile components
+                        self.ErrorDesc.Hide()
                         self.SavefileDesc.SetLabel("""\
 Loaded file.""")
+                        self.SavefileDesc.Wrap(self.SavefileDesc.GetSize()[0])
+                        self.SavefileDesc.Show()
 
-                        # if no errors, should skip subsequent pages
                         self.next.skip = True
                         self.next.next.skip = True
                         self.next.next.next.skip = True
                         self.next.next.next.next.skip = True
                         self.next.next.next.next.next.skip = True
                         self.next.next.next.next.next.next.skip = True
-                        # else skip false
+                # Else skip = false
                 else:
-                        # reset game fields
-
-
-                        self.SavefileDesc.Hide()
+                        if self.Savefile.GetValue():
+                                self.SavefileDesc.Hide()
+                                self.ErrorDesc.SetLabel("""\
+Savefile not compatible: \n""" + load)
+                                self.ErrorDesc.Wrap(self.ErrorDesc.GetSize()[0])
+                                self.ErrorDesc.Show()
+                        else:
+                                self.SavefileDesc.Hide()
+                                self.ErrorDesc.Hide()
                 
 
 class RulesetPage(RulesetPageBase):

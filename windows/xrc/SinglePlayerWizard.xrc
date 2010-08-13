@@ -111,6 +111,14 @@
         </object>
         <flag>wxEXPAND|wxALIGN_LEFT|wxALIGN_TOP</flag>
       </object>
+      <object class="sizeritem">
+        <object class="wxStaticText" name="ErrorDesc">
+          <size>400,-1</size>
+          <wrap>400</wrap>
+          <style>wxNO_BORDER|wxALIGN_LEFT|wxST_NO_AUTORESIZE</style>
+        </object>
+        <flag>wxEXPAND|wxALIGN_LEFT|wxALIGN_TOP</flag>
+      </object>
       <cols>1</cols>
       <vgap>5</vgap>
       <growablecols>1</growablecols>

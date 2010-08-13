@@ -131,6 +131,7 @@ class LoadPageBase(wx.wizard.PyWizardPage):
                 self.Savefile = XRCCTRL(self, "FileLocation")
                 self.LoadButton = XRCCTRL(self, "LoadButton")
 		self.SavefileDesc = XRCCTRL(self, "SavefileDesc")
+                self.ErrorDesc = XRCCTRL(self, "ErrorDesc")
                 
                 if hasattr(self, "OnLoad"):
 			self.Bind(wx.EVT_BUTTON, self.OnLoad, self.LoadButton)
