@@ -269,7 +269,7 @@ class winMain(winBase):
                         else:
                                 file.Enable(ID_SAVE, False)
                 except(AttributeError):
-                        file.Enable(ID_SAVE, false)
+                        file.Enable(ID_SAVE, False)
 
 		# Windows Menu
 		win = wx.Menu()
