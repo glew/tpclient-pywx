@@ -19,8 +19,10 @@ from extra.wxFloatCanvas import FloatCanvas
 
 from overlays.Resource import Resource
 from overlays.Systems  import Systems
+from overlays.Influence import Influence
 from overlays.SystemIcons  import SystemIcons
 from overlays.Path     import Paths
+from overlays.Velocity     import Velocity
 
 from windows.xrc.panelStarMap import panelStarMapBase
 
@@ -60,10 +62,28 @@ class GUIWaypoint(GUIMode.GUIMouse):
 class GUIWaypointEdit(GUIWaypoint):
 	pass
 
+class GUIMouseMoveZoom(GUIMode.GUIMouseAndMove):
+	def __init__(self, *args, **kw):
+		GUIMode.GUIMouseAndMove.__init__(self, *args, **kw)
+
+	def OnWheel(self, event):
+		pos = event.GetPosition()
+		size = self.parent.GetSize()
+		center = size[0]/2, size[1]/2
+
+		move = center[0]-pos[0], center[1]-pos[1]
+		if event.GetWheelRotation() < 0:
+			self.parent.Zoom(0.90, event.GetPosition(), 'Pixel', False)
+			self.parent.MoveImage(move, 'Pixel')
+		else:
+			self.parent.Zoom(1.10, event.GetPosition(), 'Pixel', False)
+			self.parent.MoveImage(move, 'Pixel')
+
+
 class panelStarMap(panelStarMapBase, TrackerObjectOrder):
 	title = _("StarMap")
 
-	Overlays = [(Paths, Systems), (Paths, Resource), (Paths, SystemIcons)]
+	Overlays = [(Influence, Velocity, Paths, Systems), (Paths, Resource), (Paths, SystemIcons)]
 	def __init__(self, application, parent):
 		panelStarMapBase.__init__(self, parent)
 		self.parent = parent
@@ -125,7 +145,7 @@ class panelStarMap(panelStarMapBase, TrackerObjectOrder):
 			self.DisplayMode.Append(overlay[-1].name, overlay)
 		self.DisplayMode.SetSelection(0)
 
-		self.GUISelect   = GUIMode.GUIMouseAndMove(self.Canvas)
+		self.GUISelect   =         GUIMouseMoveZoom(self.Canvas)
 		self.GUIMove     = GUIMode.GUIMove(self.Canvas)
 		self.GUIZoomIn   = GUIMode.GUIZoomIn(self.Canvas)
 		self.GUIZoomOut  = GUIMode.GUIZoomOut(self.Canvas)
@@ -229,24 +249,27 @@ class panelStarMap(panelStarMapBase, TrackerObjectOrder):
 				Overlay = None
 
 			# Remove the panel from the sizer
-			self.DisplayModeExtra.GetSizer().Remove(self.DisplayModePanel)
+			for panel in self.DisplayModePanels:
+				self.DisplayModeExtra.GetSizer().Remove(panel)
 
-			# Destroy the panel and all it's children
-			self.DisplayModePanel.Destroy()
+				# Destroy the panel and all it's children
+				panel.Destroy()
 
 			# Destory our reference to the panel
-			del self.DisplayModePanel
+			del self.DisplayModePanels
 
 		# Create a new panel
-		self.DisplayModePanel = wx.Panel(self.DisplayModeExtra)
-		#self.DisplayModePanel.SetBackgroundColour(wx.BLUE) # Only needed for debugging where the panel is covering
-		# Add the panel to the sizer
-		self.DisplayModeExtra.GetSizer().Add(self.DisplayModePanel, proportion=1, flag=wx.EXPAND)
+		self.DisplayModePanels = []
 
 		# Create the new overlay
 		self.Overlay = []
-		for Overlay in cls:
-			self.Overlay.append(Overlay(self, self.Canvas, self.DisplayModePanel, self.application.cache))
+		for i, Overlay in enumerate(cls):
+			panel = wx.Panel(self.DisplayModeExtra)
+			self.DisplayModePanels.append(panel)
+			self.DisplayModeExtra.GetSizer().Add(panel, proportion=1, flag=wx.EXPAND)
+
+			self.Overlay.append(Overlay(self, self.Canvas, panel))
+			self.Overlay[-1].layer = i
 			try:
 				self.Overlay[-1].UpdateAll()
 			except Exception, e:
@@ -257,10 +280,8 @@ class panelStarMap(panelStarMapBase, TrackerObjectOrder):
 
 		if oid != -1:
 			for Overlay in self.Overlay:
-				try:
+				if hasattr(Overlay, "SelectObject"):
 					Overlay.SelectObject(oid)
-				except NotImplementedError:
-					pass
 
 		# Force the panel to layout
 		self.DisplayModeExtra.Layout()
@@ -278,6 +299,8 @@ class panelStarMap(panelStarMapBase, TrackerObjectOrder):
 		info.MaximizeButton(True)
 		info.CaptionVisible(True)
 		info.Caption(self.title)
+		info.MinimizeButton(True)
+		info.Icon(wx.Bitmap(os.path.join(graphicsdir, "starmap-icon.png")))
 		return info
 
 	def OnSize(self, evt):
@@ -325,7 +348,7 @@ class panelStarMap(panelStarMapBase, TrackerObjectOrder):
 
 		self.ZoomLevel.SetMark(0, len(self.ZoomLevel.GetValue()))
 
-	def OnCacheUpdate(self, evt):
+	def OnObjectCacheUpdate(self, evt):
 		"""\
 		Called when the cache has been updated.
 		"""
@@ -341,6 +364,8 @@ class panelStarMap(panelStarMapBase, TrackerObjectOrder):
 			self.OnZoomLevel('fit')
 			self.OnHome(None)
 			self.Canvas.Draw()
+
+		TrackerObjectOrder.OnObjectCacheUpdate(self, evt)
 
 	def ObjectSelect(self, id):
 		"""\
@@ -381,11 +406,11 @@ class panelStarMap(panelStarMapBase, TrackerObjectOrder):
 
 				# Check if the object has a homeworld resource.
 				resourcelist = objectutils.getResources(self.application.cache, oid)
-				for resource in resourcelist:
-					if resource[0] != homeresource:
+				for resources in resourcelist:
+					if resources[0] != homeresource:
 						continue
 						
-					if resource[1] == 0:
+					if sum(resources[1:]) == 0:
 						continue
 
 					foundhomeworld = oid
@@ -440,6 +465,6 @@ class panelStarMap(panelStarMapBase, TrackerObjectOrder):
 		else:
 			TrackerObjectOrder.OnKeyUp(self, evt)
 		
-		if sys.platform == "win32":
-			self.Canvas.ProcessEvent(evt)
+		# Possibly not needed on some operation systems
+		self.Canvas.ProcessEvent(evt)
 

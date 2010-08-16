@@ -154,9 +154,10 @@ class winMain(winBase):
 		from windows.main.winIdleFinder import winIdleFinder
 		from windows.main.winDownloadManager import winDownloadManager
 		from windows.main.winGameInfo import winGameInfo
+		from windows.main.winWaiting import winWaiting
 
 		self.windows = {}
-		for window in [winDesign, winIdleFinder, winDownloadManager, winGameInfo]:
+		for window in [winDesign, winIdleFinder, winDownloadManager, winGameInfo, winWaiting]:
 			title = window.title
 			self.windows[title] = window(application, self)
 			
@@ -188,16 +189,21 @@ class winMain(winBase):
 		self.SetMenuBar(self.Menu(self))
 
 		self.updatepending = False
+		self.beenshown = False
 		self.application.gui.Binder(self.application.NetworkClass.NetworkTimeRemainingEvent, self.OnNetworkTimeRemaining)
 
 	def Show(self, show=True):
-		if not show:
-			return self.Hide()
-
 		winBase.Show(self)
 
 		# Show the tips..
-		wx.CallAfter(self.ShowTips)
+		if not self.beenshown:
+	            wx.CallAfter(self.ShowTips)
+
+		self.beenshown = True
+
+	def Hide(self, show=False):
+		self.HideChildren()
+		winBase.Hide(self)
 
 	# Config Functions -----------------------------------------------------------------------------
 	def ConfigDefault(self, config=None):
@@ -258,7 +264,7 @@ class winMain(winBase):
 		file.AppendSeparator()
                 file.Append( ID_SAVE, _("&Save the Game\tCtrl-S"),         _("Save the state of the Game to a savefile.") )
                 file.AppendSeparator()
-		file.Append( wx.ID_PREFERENCES, _("&Preferences"), _("Configure the Client") )
+		file.Append( wx.ID_PREFERENCES, _("&Preferences\tCtrl-P"), _("Configure the Client") )
 		file.AppendSeparator()
 		file.Append( ID_EXIT, _("Exit"), _("Exit") )
 
@@ -366,19 +372,6 @@ class winMain(winBase):
 			id = panel_to_menu_id[evt.EventObject]
 			menubar.FindItemById(id).Check(False)
 
-	def AccelTable(self, source):
-		source.Bind(wx.EVT_KEY_DOWN, self.temp)
-
-		# File Menu
-		table = wx.AcceleratorTable([
-			(wx.ACCEL_CTRL, ord('O'), ID_OPEN),
-			(wx.ACCEL_CTRL, ord('U'), ID_UNIV),
-		])
-		source.Bind(wx.EVT_MENU, self.temp)
-		source.Bind(wx.EVT_MENU, self.OnConnect,     id=ID_OPEN)
-		source.Bind(wx.EVT_MENU, self.UpdateCache,   id=ID_UNIV)
-		return table
-
 	def OnConnect(self, evt):
 		self.application.gui.Show(self.application.gui.connectto)
 
@@ -449,6 +442,11 @@ The turn has ended. Would you like to download all the new details?
 				self.updatepending = False
 		else:
 			self.statusbar.SetEndTime(evt.gotat + evt.remaining)
+
+		turn = "%s " % evt.frame.turn_num
+		if len(evt.frame.turn_name) > 0:
+			turn += "(%s)" % evt.frame.turn_name
+		self.statusbar.SetTurnNumber(turn)
 
 	def OnHelp(self, evt):
 		url = "http://www.thousandparsec.net/tp/documents/tpclient-pywx?version=%s" % version.version_str

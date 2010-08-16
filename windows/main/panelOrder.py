@@ -6,6 +6,7 @@ The order window.
 import time
 import copy
 import sys
+import os
 
 from extra.decorators import *
 
@@ -19,6 +20,8 @@ from tp.netlib.objects import parameters
 
 from tp.client import objectutils
 from tp.client.ChangeList import ChangeNode, ChangeHead
+
+from requirements import graphicsdir
 
 TURNS_COL = 0
 ORDERS_COL = 1
@@ -43,6 +46,8 @@ class panelOrder(panelOrderBase, TrackerObject, TrackerOrder):
 		TrackerObject.__init__(self)
 		TrackerOrder.__init__(self)
 
+		self.Master.Hide()
+
 		self.clipboard = None
 		self.ignore = False
 
@@ -61,6 +66,9 @@ class panelOrder(panelOrderBase, TrackerObject, TrackerOrder):
 		self.Orders.Bind(wx.EVT_RIGHT_UP, self.OnRightClick)
 		self.Bind(wx.EVT_KEY_UP, self.OnKeyUp)
 
+	def OnKeySkip(self, evt):
+		pass
+
 	##########################################################################
 	# AUI interface bits
 	##########################################################################
@@ -73,6 +81,8 @@ class panelOrder(panelOrderBase, TrackerObject, TrackerOrder):
 		info.Layer(2)
 		info.CaptionVisible(True)
 		info.Caption(self.title)
+		info.MinimizeButton(True)
+		info.Icon(wx.Bitmap(os.path.join(graphicsdir, "order-icon.png")))
 		return info
 
 	def DockBestSize(self):
@@ -187,7 +197,7 @@ class panelOrder(panelOrderBase, TrackerObject, TrackerOrder):
 		if self.Queues.GetCount() > 0:
 			self.Master.Show()
 			self.Master.Layout()
-			self.Master.Update()
+			self.Master.Refresh()
 		else:
 			# No possible orders on this object
 			self.Master.Hide()
@@ -411,8 +421,6 @@ class panelOrder(panelOrderBase, TrackerObject, TrackerOrder):
 		for listpos in self.Orders.GetSelected():
 			nodes.append(self.Orders.GetItemPyData(listpos))
 
-		if self.nodes == nodes:
-			return
 		self.SelectOrders(nodes)
 		
 	@freeze_wrapper
@@ -568,6 +576,7 @@ class panelOrder(panelOrderBase, TrackerObject, TrackerOrder):
 
 			# Create a new panel
 			self.ArgumentsPanel = wx.Panel(self.DetailsPanel, -1)
+			self.ArgumentsPanel.Bind(wx.EVT_KEY_UP, self.OnKeySkip)
 
 			self.ArgumentsPanel.SetAutoLayout( True )
 			self.ArgumentsSizer = wx.FlexGridSizer( 0, 1, 0, 0)
@@ -745,6 +754,19 @@ class panelOrder(panelOrderBase, TrackerObject, TrackerOrder):
 			return True
 		return False
 
+	def OnOrderCopy(self, evt):
+		if len(self.nodes) < 1:
+				return
+
+		self.clipboard = []
+
+		for node in self.nodes:
+			self.clipboard.append((node.CurrentOrder.subtype, node.CurrentOrder.__str__()))
+
+	def OnOrderCut(self, evt):
+		self.OnOrderCopy(evt)
+		self.OnOrderDelete(evt)
+
 	####################################################
 	# Window Event Handlers
 	####################################################
@@ -814,17 +836,12 @@ class panelOrder(panelOrderBase, TrackerObject, TrackerOrder):
 		t = item.GetText()
 		if t == _("Delete"):
 			self.OnOrderDelete(None)
-		elif t in (_("Copy"), _("Cut")):
-			if len(self.nodes) < 1:
-				return
-
-			self.clipboard = []
-
-			for node in self.nodes:
-				self.clipboard.append((node.CurrentOrder.subtype, node.CurrentOrder.__str__()))
-		
-			if t == _("Cut"):
-				self.OnOrderDelete(None)
+			
+		elif t == _("Copy"):
+			self.OnOrderCopy(None)
+			
+		elif t == _("Cut"):
+			self.OnOrderCut(None)
 				
 		elif t.startswith(_("Paste")):
 			if self.CheckClipBoard() == False:
@@ -836,10 +853,10 @@ class panelOrder(panelOrderBase, TrackerObject, TrackerOrder):
 			subtype, orderstring = self.clipboard[0]
 			order = objects.Header.fromstr(orderstring[:objects.Header.size])
 			order.__process__(orderstring[objects.Header.size:])
-			if t.endswith(_("After")):
-				node = self.InsertAfterOrder(order)
-			else:
+			if t.endswith(_("Before")):
 				node = self.InsertBeforeOrder(order)
+			else:
+				node = self.InsertAfterOrder(order)
 
 			for order in self.clipboard[1:]:
 				node = self.InsertAfterOrder(order, node)
@@ -913,13 +930,10 @@ class ObjectArgumentPanel(ArgumentPanel, orderObjectBase):
 		for object in objects:
 			combobox.Append(object.name + " (%s)" % object.id, object.id)
 
-			#if hasattr(object, "parent"):
-			#	combobox.SetToolTipItem(combobox.GetCount()-1, _("At ") + cache.objects[object.parent].name)
 		combobox.Thaw()
 
 	def set_value(self, list):
-		print "ObjectArgumentPanel", list
-		self.__oid = list.pop(0)
+		self.__oid = list.pop(0)[0]
 
 		combobox = self.Value
 		combobox.SetSelection(0)
@@ -931,6 +945,7 @@ class ObjectArgumentPanel(ArgumentPanel, orderObjectBase):
 	def get_value(self):
 		self.__oid = long(self.Value.GetClientData(self.Value.GetSelection()))
 		return [self.__oid, []]
+
 	
 from windows.xrc.orderPlayer import orderPlayerBase
 class PlayerArgumentPanel(ArgumentPanel, orderPlayerBase):

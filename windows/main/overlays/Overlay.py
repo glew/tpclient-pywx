@@ -20,14 +20,13 @@ class Overlay(dict):
 		raise NotImplementedError("This overlay has not specified a name! - This is bad!")
 	name = property(staticmethod(name))
 
-	def __init__(self, parent, canvas, panel, cache):
+	def __init__(self, parent, canvas, panel):
 		"""
 		Create a new Overlay object.
 
 		parent is the application which can be used to post events.
 		canvas is the wx.FloatCanvas to draw onto.
 		panel  is the toolbar panel which the overlay can add it's own icons/widgets too.
-		cache  is the libtpclient-py cache containing the universe data.
 		"""
 		self.parent      = parent
 		self.application = self.parent.application 
@@ -35,10 +34,6 @@ class Overlay(dict):
 		if canvas is None:
 			raise TypeError("Canvas can not be none!")
 		self.canvas = canvas
-
-		if cache is None:
-			raise TypeError("Cache can not be none!")
-		self.cache  = cache
 
 		self.panel  = panel
 
@@ -60,11 +55,17 @@ class Overlay(dict):
 		if type(value) in (list, tuple):
 			for v in value:
 				if not self.layer is None:
-					v.DrawOrder = self.layer
+					if hasattr(v, 'DrawOrder'):
+						v.DrawOrder = (self.layer, v.DrawOrder)
+					else:
+						v.DrawOrder = (self.layer, 0)
 				self.canvas.AddObject(v)
 		else:
 			if not self.layer is None:
-				value.DrawOrder = self.layer
+				if hasattr(value, 'DrawOrder'):
+					value.DrawOrder = (self.layer, value.DrawOrder)
+				else:
+					value.DrawOrder = (self.layer, 0)
 			self.canvas.AddObject(value)
 		dict.__setitem__(self, key, value)
 
@@ -122,14 +123,14 @@ class Overlay(dict):
 		# FIXME: Horrible hack to make things draw in type order, and then by name.
 		# Various overlays probably want to be able to override this..
 		types = {}
-		for i in self.cache.objects.keys():
-			t = self.cache.objects[i].__class__.__name__
+		for i in self.application.cache.objects.keys():
+			t = self.application.cache.objects[i].__class__.__name__
 			if t not in types:
 				types[t] = []
 			types[t].append(i)
 
 		def objcmp(oida, oidb):
-			return cmp(self.cache.objects[oida].name, self.cache.objects[oidb].name)
+			return cmp(self.application.cache.objects[oida].name, self.application.cache.objects[oidb].name)
 
 		for name, value in types.items():
 			value.sort(objcmp)
@@ -160,6 +161,7 @@ class Overlay(dict):
 		Simulates this as a mouse click.
 		"""
 		raise NotImplementedError("Select Object method has not been implemented!")
+
 
 class Holder(list):
 	"""
@@ -287,18 +289,20 @@ class SystemLevelOverlay(Overlay, TrackerObject):
 		"""
 		Update an object in the Overlay.
 		"""
-		obj = self.cache.objects[oid]
+		obj = self.application.cache.objects[oid]
 
 		# Don't draw top level objects.
-		if objectutils.isTopLevel(self.cache, oid):
+		if objectutils.isTopLevel(self.application.cache, oid):
 			self[oid] = []
 			return
 					
 		# Don't save key for sub-objects because they are drawn as part of systems:
-		if not objectutils.isTopLevel(self.cache, obj.parent):
+		if not objectutils.isTopLevel(self.application.cache, obj.parent):
 			return
 
 		icon = self.Icon(obj)
+		if not icon:
+			return
 		self[oid] = icon
 
 		from extra.wxFloatCanvas.FloatCanvas import EVT_FC_ENTER_OBJECT, EVT_FC_LEAVE_OBJECT
@@ -338,13 +342,13 @@ class SystemLevelOverlay(Overlay, TrackerObject):
 		parentid = oid
 		while not self.has_key(parentid):
 			try:
-				parentid = self.cache.objects[parentid].parent
+				parentid = self.application.cache.objects[parentid].parent
 			except AttributeError:
 				self.Selected = None
 				return
 
-		system = self.cache.objects[parentid]
-		real   = self.cache.objects[oid]
+		system = self.application.cache.objects[parentid]
+		real   = self.application.cache.objects[oid]
 
 		if self[system.id] == []:
 			self.Selected = None

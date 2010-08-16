@@ -35,14 +35,18 @@ class ImageIcon(Group, Holder, IconMixIn):
 	"""
 	def copy(self):
 		# FIXME: Very expensive
-		return SystemIcon(self.cache, self.primary, self.Colorizer)
+		return SystemIcon(self.tmpcache, self.primary, self.Colorizer)
 
-	def __init__(self, cache, canvas, system, image, colorizer=None):
+	def __init__(self, tmpcache, canvas, system, image, colorizer=None):
 
-		Holder.__init__(self, system, FindChildren(cache, system))
+		kids = []
+		for cid in objectutils.findChildren(tmpcache, system.id):
+			kids.append(tmpcache.objects[cid])	
+
+		Holder.__init__(self, system, kids)
 
 		# Get the colors of the object
-		IconMixIn.__init__(self, cache, colorizer)
+		IconMixIn.__init__(self, tmpcache, colorizer)
 		type, childtype = self.GetColors()
 
 		# Create a list of the objects
@@ -63,13 +67,11 @@ class ImageIcon(Group, Holder, IconMixIn):
 
 from extra.StateTracker import TrackerObjectOrder
 class SystemIcons(Systems, FileTrackerMixin):
-	name     = "Icons"
-	toplevel = [] #Galaxy, Universe
-
+	name = "Icons"
 	Colorizers = [ColorVerses, ColorEach]
 
-	def __init__(self, parent, canvas, panel, cache, *args, **kw):
-		Systems.__init__(self, parent, canvas, panel, cache, *args, **kw)
+	def __init__(self, parent, canvas, panel, *args, **kw):
+		Systems.__init__(self, parent, canvas, panel, *args, **kw)
 
 		FileTrackerMixin.__init__(self, self.application)
 
@@ -77,22 +79,25 @@ class SystemIcons(Systems, FileTrackerMixin):
 		images = self.application.media.getImages(obj.id)
 		self.ClearURLs()
 		self.AddObjectURLs(obj.id)
-		if len(images) <= 0:
-			return SystemIcon(self.cache, obj, self.Colorizer)
-		else:
-			icon = None
-			for name, files in images:
-				if "Icon" not in name:
-					continue
-				
-				# FIXME: Just use the first file. Might want to do something more?
-				icon = wx.Image(files[0]).ConvertToBitmap()
-				break
+
+		icon = None
+		for name, files in images:
+			if "Icon" not in name:
+				continue
 			
-			if not icon:
-				return SystemIcon(self.cache, obj, self.Colorizer)
+			# FIXME: Just use the first file. Might want to do something more?
+			icon = wx.Image(files[0]).ConvertToBitmap()
+			break
 		
-		return ImageIcon(self.cache, self.canvas, obj, icon, self.Colorizer)
+		if not icon:
+			if len(objectutils.getPositionList(obj)) == 1:
+				icon = SystemIcon(self.application.cache, obj, self.Colorizer)
+			else:
+				icon = WormholeIcon(self.application.cache, obj, self.Colorizer)
+				icon.DrawOrder = -100
+			return icon
+		
+		return ImageIcon(self.application.cache, self.canvas, obj, icon, self.Colorizer)
 	
 	def OnMediaUpdate(self, evt):
 		self.UpdateAll()

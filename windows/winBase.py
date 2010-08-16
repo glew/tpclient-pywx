@@ -130,7 +130,7 @@ class winMixIn(object):
 
 	def OnClose(self, evt):
 		# Ignore close events
-		if evt.CanVeto():
+		if hasattr(evt, 'CanVeto') and evt.CanVeto():
 			evt.Veto(True)
 		self.Hide()
 
@@ -152,7 +152,7 @@ class winBaseMixIn(winMixIn):
 
 	def HideChildren(self):
 		for window in self.children.values():
-			if isinstance(window, winBase):
+			if isinstance(window, winMixIn):
 				window.Hide()
 
 	def RaiseChildren(self):

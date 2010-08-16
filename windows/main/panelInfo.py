@@ -56,6 +56,8 @@ class panelInformation(panelInformationBase):
 		info.Layer(2)
 		info.CaptionVisible(True)
 		info.Caption(self.title)
+		info.MinimizeButton(True)
+		info.Icon(wx.Bitmap(os.path.join(graphicsdir, "info-icon.png")))
 		return info
 
 	def OnMediaUpdate(self, evt):
@@ -125,27 +127,35 @@ class panelInformation(panelInformationBase):
 		self.DetailsSizer.Add( self.ArgumentsPanel, flag=wx.GROW|wx.EXPAND|wx.ALIGN_CENTER|wx.ALL)
 		
 		self.OnSize(None)
+		
 
 	def OnSize(self, evt):
+                self.DetailsPanel.SetupScrolling(False, True)
 		bestsize = self.FoldPanelBar.GetPanelsLength(True, True)
 		self.DetailsPanel.SetVirtualSize((bestsize[1]/2, bestsize[2]))
 		self.FoldPanelBar.RedisplayFoldPanelItems()
 		self.Layout()
 
 def GetPanelForReference(application, parent, type, id, quantity=-1):
-	cache = application.cache
+	tmpcache = application.cache
 	reftype = GenericRS.Types[type]
 	if "Player Action" in reftype:
 		pass
 	elif "Player" in reftype:
 		panel = infoReferencePlayer(parent)
-		panel.setPlayer(cache.players[id].name, id, quantity)
+		if id == 0:
+			name = "No one"
+		elif id not in tmpcache.players:
+			name = "Unknown"
+		else:
+			name = tmpcache.players[id].name
+		panel.setPlayer(name, id, quantity)
 		return panel
 	elif "Object Action" in reftype:
 		pass
 	elif "Object" in reftype:
 		panel = infoReferenceObject(parent, application)
-		panel.setObject(cache.objects[id].name, id, quantity)
+		panel.setObject(tmpcache.objects[id].name, id, quantity)
 		return panel
 	elif "Order Type" in reftype:
 		panel = infoReferenceOrderDesc(parent)
@@ -158,15 +168,15 @@ def GetPanelForReference(application, parent, type, id, quantity=-1):
 		return panel
 	elif "Order Instance" in reftype:
 		panel = infoReferenceOrder(parent)
-		panel.setOrder(cache.orders[id].name, id, quantity)
+		panel.setOrder(tmpcache.orders[id].name, id, quantity)
 		return panel
 	elif "Resource Description" in reftype:
 		panel = infoReferenceResource(parent)
-		panel.setResource(cache.resources[id].name, id, quantity)
+		panel.setResource(tmpcache.resources[id].name, id, quantity)
 		return panel
 	elif "Design" in reftype:
 		panel = infoReferenceDesign(parent)
-		panel.setDesign(cache.designs[id].name, id, quantity)
+		panel.setDesign(tmpcache.designs[id].name, id, quantity)
 		return panel
 	elif "Board" in reftype:
 		pass
@@ -374,7 +384,6 @@ class FoldPanel(ArgumentPanel, FoldPanelBase, FileTrackerMixin):
 	def __init__(self, parent, application):
 		FoldPanelBase.__init__(self, parent)
 		self.application = application
-		self.cache = self.application.cache
 		FileTrackerMixin.__init__(self, application)
 		self.Layout()
 		
@@ -451,7 +460,7 @@ class FoldPanel(ArgumentPanel, FoldPanelBase, FileTrackerMixin):
 			orderpanel = infoOrderQueue(item)
 			orderpanel.setQueueID(attr.queueid)
 
-			queue = self.cache.orderqueues[attr.queueid]
+			queue = self.application.cache.orderqueues[attr.queueid]
 			orderpanel.setNumOrders(queue.numorders)
 			types = "["
 			if len(queue.ordertypes) > 0:
@@ -467,11 +476,17 @@ class FoldPanel(ArgumentPanel, FoldPanelBase, FileTrackerMixin):
 			containerpanel = infoReferenceContainer(item)
 			for id, stored, minable, unavailable in attr.resources:
 				panel = infoResourcePanel(containerpanel)
-				panel.setName(self.cache.resources[id].name)
+				panel.setName(self.application.cache.resources[id].name)
 				panel.setValues(stored, minable, unavailable)
 				containerpanel.addPanel(panel)
 				containerpanel.Layout()
 			self.FoldBar.AddFoldPanelWindow(item, containerpanel, fpb.FPB_ALIGN_WIDTH, 5, 20)
+			return
+		elif isinstance(group, parameters.ObjectParamInfluence):
+			integer = "%s" % attr.diameter
+			integerpanel = infoInteger(item)
+			integerpanel.setIntegerLabel(integer)
+			self.FoldBar.AddFoldPanelWindow(item, integerpanel, fpb.FPB_ALIGN_WIDTH, 5, 20)
 			return
 
 	def GetPanelsLength(self, collapsed, expanded):

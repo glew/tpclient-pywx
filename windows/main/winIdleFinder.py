@@ -13,11 +13,15 @@ from tp.client import objectutils
 
 # Local imports
 from windows.winBase import winReportXRC, ShiftMixIn
-from windows.xrc.winIdleFinder import IdleFinderBase
+from windows.xrc.winIdleFinder import winIdleFinderBase
 # Shows messages from the game system to the player.
 from extra.StateTracker import TrackerObject
 
-class winIdleFinder(winReportXRC, IdleFinderBase, TrackerObject):
+ID = 0
+NAME = 1
+TYPE = 2
+
+class winIdleFinder(winReportXRC, winIdleFinderBase, TrackerObject):
 	"""\
 	This window shows a list of objects you own that do not have any orders.
 	
@@ -36,58 +40,66 @@ class winIdleFinder(winReportXRC, IdleFinderBase, TrackerObject):
 		"""\
 		Create the IdleFinder window and initialize the columns and event bindings.
 		"""
-		IdleFinderBase.__init__(self, parent)
+		winIdleFinderBase.__init__(self, parent)
 		winReportXRC.__init__(self, application, parent)
 		
 		self.application = application
 		self.oid = -1
 		# Create a panel for the current window.
-		self.idlelist.InsertColumn(0, "Item ID", width = 100)
-		self.idlelist.InsertColumn(1, "Item Name", width = 200)
-		self.idlelist.InsertColumn(2, "Item Type", width = 100)
+		self.IdleList.InsertColumn(ID, "Item ID", width = 100)
+		self.IdleList.InsertColumn(NAME, "Item Name", width = 200)
+		self.IdleList.InsertColumn(TYPE, "Item Type", width = 100)
 
 		self.ascending = 1
 
 		self.Bind(wx.EVT_SHOW, self.OnShow)
 		self.Bind(wx.EVT_ACTIVATE, self.OnShow)
-		self.idlelist.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.SelectObject)
-		self.idlelist.Bind(wx.EVT_LIST_COL_CLICK, self.OnColClick)
+		self.IdleList.Bind(wx.EVT_LIST_ITEM_ACTIVATED, self.SelectObject)
+		self.IdleList.Bind(wx.EVT_LIST_COL_CLICK, self.OnColClick)
 
 	def OnShow(self, evt):
 		"""\
 		Runs when the window is shown. Finds idle objects and adds them to the list.
 		"""
-		self.idlelist.DeleteAllItems()
+		self.IdleList.DeleteAllItems()
 		numinlist = 0
 		universe = self.application.cache.objects.keys()
-		for object in universe:
-			hasorders = False
+
+		for oid in universe:
+			isidle = False
 			
 			# Only show objects owned by this player
-			if not objectutils.getOwner(self.application.cache, object) == self.application.cache.players[0].id:
+			if not objectutils.getOwner(self.application.cache, oid) == self.application.cache.players[0].id:
 				continue
 			
-			orderqueuelist = objectutils.getOrderQueueList(self.application.cache, object)
-			
-			if orderqueuelist == None or len(orderqueuelist) <= 0:
+			orderqueuelist = objectutils.getOrderQueueList(self.application.cache, oid)
+			ordertypes = objectutils.getOrderTypes(self.application.cache, oid)
+
+			if orderqueuelist == None or len(orderqueuelist) <= 0 or len(ordertypes) <= 0:
 				continue
 			
 			# Find any orders for this object in any of its queues.
 			for name, queue in orderqueuelist:
 				if not self.application.cache.orders.has_key(queue):
 					continue
-				if len(self.application.cache.orders[queue]) > 0:
-					hasorders = True
+
+				# Consider only queues with non-empty order types
+				if len(ordertypes[queue]) <= 0:
+					continue
+
+				if len(self.application.cache.orders[queue]) <= 0:
+					isidle = True
 					break
-			if hasorders:
+
+			if not isidle:
 				continue
 			
 			# If the object has no orders, add it to the list
-			self.idlelist.InsertStringItem(numinlist, "%d" % object)
-			self.idlelist.SetStringItem(numinlist, 1, self.application.cache.objects[object].name)
-			desc = objects.ObjectDescs()[self.application.cache.objects[object].subtype]
-			self.idlelist.SetStringItem(numinlist, 2, desc.name)
-			self.idlelist.SetItemData(numinlist, object)
+			self.IdleList.InsertStringItem(numinlist, "%d" % oid)
+			self.IdleList.SetStringItem(numinlist, NAME, self.application.cache.objects[oid].name)
+			desc = objects.ObjectDescs()[self.application.cache.objects[oid].subtype]
+			self.IdleList.SetStringItem(numinlist, TYPE, desc._name)
+			self.IdleList.SetItemData(numinlist, oid)
 				
 			numinlist = numinlist + 1
 		
@@ -121,7 +133,7 @@ class winIdleFinder(winReportXRC, IdleFinderBase, TrackerObject):
 		"""
 		self.col = event.GetColumn()
 		self.ascending *= -1
-		self.idlelist.SortItems(self.Sort)
+		self.IdleList.SortItems(self.Sort)
 	
 	def OnClose(self, evt):
 		"""\

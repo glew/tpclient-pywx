@@ -19,9 +19,11 @@ from tp.netlib.objects import Order
 from tp.netlib.objects import parameters
 from tp.client import objectutils
 
+from requirements import graphicsdir
+
 from Overlay import Overlay
 
-def FindPath(cache, obj):
+def FindPath(tmpcache, obj):
 	"""
 	Figure out the path this object will take.
 
@@ -37,11 +39,11 @@ def FindPath(cache, obj):
 		raise TypeError("Object must have at least one position: %r" % obj)
 
 	locations = [(-1, positions[0][:3])]
-	orderqueues = objectutils.getOrderQueueList(cache, obj.id)
+	orderqueues = objectutils.getOrderQueueList(tmpcache, obj.id)
 
 	# FIXME: Need correct way to handle all order queues
 	for queuename, queueid in orderqueues:
-		for listpos, node in enumerate(cache.orders[queueid]):
+		for listpos, node in enumerate(tmpcache.orders[queueid]):
 			order = node.CurrentOrder
 			# FIXME: Needs to be a better way to do this...
 			for property in order.properties:
@@ -49,7 +51,7 @@ def FindPath(cache, obj):
 					coordinates = getattr(order, property.name).coordinates
 					locations.append((node, (coordinates.x, coordinates.y, coordinates.z)))
 				elif isinstance(property, parameters.OrderParamObject):
-					pointedobject = cache.objects[getattr(order, property.name).objectid]
+					pointedobject = tmpcache.objects[getattr(order, property.name).objectid]
 					positions = objectutils.getPositionList(pointedobject)
 					if len(positions) > 0:
 						# FIXME: Do something about multiple positions?
@@ -178,18 +180,34 @@ class Paths(Overlay, TrackerObjectOrder):
 	"""\
 	Draws a path of ships and similar objects.
 	"""
-	name     = "Paths"
-	toplevel = [] #Galaxy, Universe
-
+	name = "Paths"
 	layer = -1
 
-	def __init__(self, parent, canvas, panel, cache, *args, **kw):
-		Overlay.__init__(self, parent, canvas, panel, cache, *args, **kw)
+	def __init__(self, parent, canvas, panel, *args, **kw):
+		Overlay.__init__(self, parent, canvas, panel, *args, **kw)
+
+		self.Toggle = wx.lib.buttons.ThemedGenBitmapToggleButton(
+			panel, -1, wx.Bitmap(os.path.join(graphicsdir, "path-icon.png")))
+		self.Toggle.SetValue(True)
+		self.panel.Bind(wx.EVT_BUTTON, self.OnToggle, self.Toggle)
+
+		# Populate the colorizer dropdown with information
+		sizer = wx.FlexGridSizer(1)
+		sizer.AddGrowableRow(0)
+		sizer.Add(self.Toggle, proportion=1, flag=wx.EXPAND)
+		panel.SetSizer(sizer)
 
 		self.active = []
 		TrackerObjectOrder.__init__(self)	
 
+	def OnToggle(self, evt):
+		self.UpdateAll()
+		self.canvas.Draw()
+
 	def UpdateOne(self, oid, overrides={}):
+		if not self.Toggle.GetValue():
+			return
+
 		# Remove all the previous segments
 		for nid, nodeid in self.keys():
 			if oid == nid:
@@ -199,9 +217,9 @@ class Paths(Overlay, TrackerObjectOrder):
 			self.active = []
 
 		# Create the new path
-		path = FindPath(self.cache, self.cache.objects[oid])
+		path = FindPath(self.application.cache, self.application.cache.objects[oid])
 		if not path is None:
-			previous = self.cache.objects[oid]
+			previous = self.application.cache.objects[oid]
 			for node, end in path[1:]:
 				segment = PathSegment((oid, node), end, previous)
 

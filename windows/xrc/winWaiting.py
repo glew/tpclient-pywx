@@ -11,7 +11,7 @@ from wx.xrc import XRCCTRL, XmlResourceWithHandlers
 # Local imports
 from requirements import location
 
-class winIdleFinderBase:
+class winWaitingBase:
 	"""\
 Unlike a normal XRC generated class, this is a not a full class but a MixIn.
 Any class which uses this as a base must also inherit from a proper wx object
@@ -20,7 +20,7 @@ such as the wx.Frame class.
 This is so that a the same XRC can be used for both MDI and non-MDI frames.
 """
 
-	xrc = os.path.join(location(), "windows", "xrc", 'winIdleFinder.xrc')
+	xrc = os.path.join(location(), "windows", "xrc", 'winWaiting.xrc')
 
 	def PreCreate(self, pre):
 		""" This function is called during the class's initialization.
@@ -48,16 +48,27 @@ This is so that a the same XRC can be used for both MDI and non-MDI frames.
 		
 		# Two stage creation (see http://wiki.wxpython.org/index.cgi/TwoStageCreation)
 		pre = getattr(wx, "Pre%s" % base.__name__)()
-		if not res.LoadOnFrame(pre, parent, "winIdleFinder"):
-			raise IOError("Did not find the winIdleFinder in the XRC file")
+		if not res.LoadOnFrame(pre, parent, "winWaiting"):
+			raise IOError("Did not find the winWaiting in the XRC file")
 		self.PreCreate(pre)
 		self.PostCreate(pre)
 
 		# Define variables for the controls
-		self.Base = XRCCTRL(self, "Base")
-		self.IdleList = XRCCTRL(self, "IdleList")
+		self.Panel = XRCCTRL(self, "Panel")
+		self.TitleText = XRCCTRL(self, "TitleText")
+		self.Message = XRCCTRL(self, "Message")
+		self.WaitingFor = XRCCTRL(self, "WaitingFor")
+		self.WaitingList = XRCCTRL(self, "WaitingList")
+		self.Cancel = XRCCTRL(self, "wxID_CANCEL")
+		if hasattr(self, "OnCancel"):
+			self.Bind(wx.EVT_BUTTON, self.OnCancel, self.Cancel)
+
 
 
 def strings():
 	pass
-	_("Objects Without Orders");
+	_("End of turn requested!");
+	_("Thanks for requesting end of turn.\n\nThe turn will end as soon as the other players get their buttocks into gear and click the end of turn button too.");
+	_("Waiting for:");
+	_("&Cancel");
+	_("TP: Connect to a Server");

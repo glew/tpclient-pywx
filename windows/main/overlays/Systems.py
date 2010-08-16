@@ -4,7 +4,7 @@ This overlay draws Star Systems on the Starmap.
 # Python imports
 from math import *
 import copy
-import numpy as N
+from cgi import escape
 
 # wxPython imports
 import wx
@@ -13,15 +13,8 @@ from extra.wxFloatCanvas.RelativePoint import RelativePoint, RelativePointSet
 from extra.wxFloatCanvas.PolygonStatic import PolygonArrow, PolygonShip
 
 # tp imports
-from tp.netlib.objects import constants
 from tp.netlib.objects.parameters import OrderParamAbsSpaceCoords, OrderParamObject
 from tp.netlib.objects                        import Object, OrderDescs
-#from tp.netlib.objects.ObjectExtra.Universe   import Universe
-#from tp.netlib.objects.ObjectExtra.Galaxy     import Galaxy
-#from tp.netlib.objects.ObjectExtra.StarSystem import StarSystem
-#from tp.netlib.objects.ObjectExtra.Planet     import Planet
-#from tp.netlib.objects.ObjectExtra.Fleet      import Fleet
-#from tp.netlib.objects.ObjectExtra.Wormhole   import Wormhole
 
 from tp.netlib import GenericRS
 
@@ -30,37 +23,6 @@ from tp.client import objectutils
 from Overlay   import SystemLevelOverlay, Holder
 from Colorizer import *
 
-def FindChildren(cache, obj):
-	"""
-	Figure out all the children of this object.
-	"""
-	if not isinstance(obj, Object):
-		raise TypeError("Object must be an object not %r" % obj)
-
-	kids = set()
-	for cid in obj.contains:
-		child = cache.objects[cid]
-
-		kids.update(FindChildren(cache, child))
-		kids.add(child)
-
-	return list(kids)
-
-def FindOwners(cache, obj):
-	"""
-	Figure out the owners of this oidect (and it's children).
-	"""
-	if not isinstance(obj, Object):
-		raise TypeError("Object must be an object not %r" % obj)
-
-	owners = set()
-	for child in [obj]+FindChildren(cache, obj):
-		owner = objectutils.getOwner(cache, child.id)
-
-		if owner in (0, -1):
-			continue
-		owners.add(owner)
-	return list(owners)
 
 class IconMixIn:
 	"""
@@ -68,8 +30,8 @@ class IconMixIn:
 	PrimarySize = 3
 	ChildSize   = 3
 
-	def __init__(self, cache, colorizer):
-		self.cache = cache
+	def __init__(self, tmpcache, colorizer):
+		self.tmpcache = tmpcache
 		self.SetColorizer(colorizer)
 
 	# FIXME: Should probably just monkey patch this onto Group?
@@ -92,11 +54,11 @@ class IconMixIn:
 		self.Colorizer = colorizer
 
 	def GetColors(self):
-		parentcolor = self.Colorizer(FindOwners(self.cache, self.primary))
+		parentcolor = self.Colorizer(self.tmpcache, self.primary.id)
 		
 		childrencolors = []
 		for child in self.children:
-			childrencolors.append(self.Colorizer(FindOwners(self.cache, child)))
+			childrencolors.append(self.Colorizer(self.tmpcache, child.id))
 	
 		return parentcolor, childrencolors
 
@@ -106,43 +68,41 @@ class SystemIcon(Group, Holder, IconMixIn):
 	"""
 	def copy(self):
 		# FIXME: Very expensive
-		return SystemIcon(self.cache, self.primary, self.Colorizer)
+		return SystemIcon(self.tmpcache, self.primary, self.Colorizer)
 
-	def __init__(self, cache, system, colorizer=None):
+	def __init__(self, tmpcache, system, colorizer=None):
 
-		Holder.__init__(self, system, FindChildren(cache, system))
+		kids = []
+		for cid in objectutils.findChildren(tmpcache, system.id):
+			kids.append(tmpcache.objects[cid])
+
+		Holder.__init__(self, system, kids)
 
 		# Get the colors of the object
-		IconMixIn.__init__(self, cache, colorizer)
+		IconMixIn.__init__(self, tmpcache, colorizer)
 		type, childtype = self.GetColors()
 
 		# Create a list of the objects
 		ObjectList = []
 
 		positionlist = objectutils.getPositionList(system)
-		if positionlist == []:
-			raise TypeError('Object passed to SystemIcon has no coordinates, %r' % system)
+		if len(positionlist) != 1:
+			raise TypeError('Object passed to SystemIcon has wrong number of coordinates, %r %r' % (system, positionlist))
 
-		prevpos = ()
-		# The center point for each position
-		for position in positionlist:
-			ObjectList.append(Point(position[0:2], type, self.PrimarySize, False))
-			if prevpos != ():
-				ObjectList.append(Line((prevpos[0:2], position[0:2]), type))
-			prevpos = position
+		position = positionlist[0]
+
+		ObjectList.append(Point(position[0:2], type, self.PrimarySize, False))
 
 		if len(self.children) > 0:
 			# The orbit bits
-			for position in positionlist:
-				ObjectList.insert(0, Point(position[0:2], "Black", 8, InForeground=True))
-				ObjectList.insert(0, Point(position[0:2], "Grey",  9, InForeground=True))
+			ObjectList.insert(0, Point(position[0:2], "Black", 8, InForeground=True))
+			ObjectList.insert(0, Point(position[0:2], "Grey",  9, InForeground=True))
 	
 			# The orbiting children
 			for i, childtype in enumerate(childtype):
-				for position in positionlist:
-					ObjectList.append(
-						RelativePoint(position[0:2], childtype, self.ChildSize, True, self.ChildOffset(i))
-					)
+				ObjectList.append(
+					RelativePoint(position[0:2], childtype, self.ChildSize, True, self.ChildOffset(i))
+				)
 
 		Group.__init__(self, ObjectList, False)
 
@@ -152,16 +112,16 @@ class FleetIcon(Group, Holder, IconMixIn):
 	"""
 	def copy(self):
 		# FIXME: Very expensive
-		return FleetIcon(self.cache, self.primary, self.Colorizer)
+		return FleetIcon(self.tmpcache, self.primary, self.Colorizer)
 
-	def __init__(self, cache, fleet, colorizer=None):
-		if len(FindChildren(cache, fleet)) > 0:
+	def __init__(self, tmpcache, fleet, colorizer=None):
+		if len(objectutils.findChildren(tmpcache, fleet.id)) > 0:
 			raise TypeError('The fleet has children! WTF?')
 
 		Holder.__init__(self, fleet, [])
 
 		# Get the colors of the object
-		IconMixIn.__init__(self, cache, colorizer)
+		IconMixIn.__init__(self, tmpcache, colorizer)
 		type, childtype = self.GetColors()
 
 		# Create a list of the objects
@@ -184,42 +144,42 @@ class WormholeIcon(Group, Holder, IconMixIn):
 	"""
 	def copy(self):
 		# FIXME: Very expensive
-		return WormholeIcon(self.cache, self.primary, self.Colorizer)
+		return WormholeIcon(self.tmpcache, self.primary, self.Colorizer)
 
 	def XY(self):
 		return self.ObjectList[0].Points[0]+(self.ObjectList[0].Points[1]-self.ObjectList[0].Points[0])/2
 	XY = property(XY)
 
-	def __init__(self, cache, wormhole, colorizer=None):
-		if not isinstance(wormhole, Wormhole):
-			raise TypeError('WormholeIcon must be given a Wormhole, %r' % system)
-
-		if len(FindChildren(cache, wormhole)) > 0:
-			raise TypeError('The wormhole has children! WTF?')
-
+	def __init__(self, tmpcache, wormhole, colorizer=None):
 		Holder.__init__(self, wormhole, [])
 
 		# Get the colors of the object
-		IconMixIn.__init__(self, cache, colorizer)
+		IconMixIn.__init__(self, tmpcache, colorizer)
 		type, childtype = self.GetColors()
 
 		# Create a list of the objects
 		ObjectList = []
 
 		# The little ship icon
-		ObjectList.append(Line((wormhole.start[0:2], wormhole.end[0:2]), type))
+		positions = objectutils.getPositionList(wormhole)
+
+		start = positions.pop(0)
+		while len(positions) > 0:
+			end = positions.pop(0)
+		
+			ObjectList.append(Line((start[0:2], end[0:2]), type))
+
+			start = end
 
 		Group.__init__(self, ObjectList, False)
 
 from extra.StateTracker import TrackerObjectOrder
 class Systems(SystemLevelOverlay, TrackerObjectOrder):
 	name     = "Systems"
-	toplevel = [] #Galaxy, Universe
-
 	Colorizers = [ColorVerses, ColorEach]
 
-	def __init__(self, parent, canvas, panel, cache, *args, **kw):
-		SystemLevelOverlay.__init__(self, parent, canvas, panel, cache, *args, **kw)
+	def __init__(self, parent, canvas, panel, *args, **kw):
+		SystemLevelOverlay.__init__(self, parent, canvas, panel, *args, **kw)
 
 		self.canvas.SetCursor(wx.StockCursor(wx.CURSOR_RIGHT_ARROW))
 
@@ -249,7 +209,7 @@ class Systems(SystemLevelOverlay, TrackerObjectOrder):
 
 		if not isinstance(self.Colorizer, cls):
 			# Change the colorizer
-			self.Colorizer = cls(self.cache.players[0].id)
+			self.Colorizer = cls(self.application.cache.players[0].id)
 
 			if not evt is None:
 				self.CleanUp()
@@ -266,10 +226,15 @@ class Systems(SystemLevelOverlay, TrackerObjectOrder):
 			self['selected-arrow'].Hide()
 
 	def Icon(self, obj):
-		if objectutils.isFleet(self.cache, obj.id):
-			return FleetIcon(self.cache, obj, self.Colorizer)
-		
-		return SystemIcon(self.cache, obj, self.Colorizer)
+		if objectutils.isFleet(self.application.cache, obj.id):
+			return FleetIcon(self.application.cache, obj, self.Colorizer)
+	
+		if len(objectutils.getPositionList(obj)) == 1:	
+			return SystemIcon(self.application.cache, obj, self.Colorizer)
+		else:
+			icon = WormholeIcon(self.application.cache, obj, self.Colorizer)
+			icon.DrawOrder = -100
+			return icon
 
 	def ArrowTo(self, arrow, icon, object):
 		arrow.SetPoint(icon.XY)
@@ -387,8 +352,8 @@ class Systems(SystemLevelOverlay, TrackerObjectOrder):
 			if self.oid is None:
 				return orders
 
-			queuelist = objectutils.getOrderQueueList(self.cache, self.oid)
-			ordertypes = objectutils.getOrderTypes(self.cache, self.oid)
+			queuelist = objectutils.getOrderQueueList(self.application.cache, self.oid)
+			ordertypes = objectutils.getOrderTypes(self.application.cache, self.oid)
 
 			# Find possible order types in all order queues
 			for queuename, queueid in queuelist:
@@ -424,7 +389,7 @@ class Systems(SystemLevelOverlay, TrackerObjectOrder):
 						# A callback function for a menu item with object order parameter
 						def ObjectOrderItemSelected(toobject, toqueueid=queueid, how=orderdesc):
 							# Compose arguments list for Order
-							args = [-1, toqueueid, -1, how.subtype, 0, [], toobject.id]
+							args = [-1, toqueueid, -1, how.subtype, 0, [], (toobject.id, [])]
 							
 							neworder = how(*args)
 							neworder._dirty = True
@@ -492,7 +457,7 @@ class Systems(SystemLevelOverlay, TrackerObjectOrder):
 		# Draw the path of the object
 		paths = []
 ##		for i, cobj in enumerate(icon):
-##			path = FindPath(self.cache, cobj)
+##			path = FindPath(self.application.cache, cobj)
 ##			if path:
 ##				pr = path[0]
 ##				for p in path[1:]:
@@ -529,17 +494,17 @@ class Systems(SystemLevelOverlay, TrackerObjectOrder):
 		s = "<font size='%s'>" % wx.local.normalFont.GetPointSize()
 		for i, cobj in enumerate(icon):
 			# Italics the currently selected object
-			style = 'normal'
+			weight = 'normal'
 			if self.Selected != None and self.Selected.current == cobj:
-				style = 'italic'
+				weight = 'bold'
 
-			color = icon.Colorizer(FindOwners(self.cache, cobj))
+			color = icon.Colorizer(self.application.cache, cobj.id)
 
 			# Tabulate non-systems
-			if not objectutils.isTopLevel(self.cache, cobj.parent):
+			if not objectutils.isTopLevel(self.application.cache, cobj.parent):
 				s += "  "
 				
-			s += "<font style='%s' color='%s'>%s" % (style, color, cobj.name)
+			s += "<font weight='%s' color='%s'>%s" % (weight, color, cobj.name)
 
 			# Add text about ships
 			for propertygroup in cobj.properties:
@@ -555,13 +520,13 @@ class Systems(SystemLevelOverlay, TrackerObjectOrder):
 					shipcount = shiplist[2]
 					if reftype == GenericRS.Types["Design"]:
 						try:
-							s += "\n    %s %ss" % (shipcount, self.cache.designs[shipid].name)
+							s += escape("\n  %s %ss" % (shipcount, self.application.cache.designs[shipid].name))
 						except KeyError:
-							s += "\n  %s %ss" % (shipcount, "Unknown Ships")
+							s += escape("\n  %s %ss" % (shipcount, "Unknown Ships"))
 					elif reftype == GenericRS.Types["Object"]:
-						s += "\n  %s %ss" % (shipcount, self.cache.objects[shipid].name)
+						s += escape("\n  %s %ss" % (shipcount, self.application.cache.objects[shipid].name))
 					else:
-						s += "\n  %s %ss" % (shipcount, "Unknown Ships")
+						s += escape("\n  %s %ss" % (shipcount, "Unknown Ships"))
 
 			s += "</font>\n"
 
