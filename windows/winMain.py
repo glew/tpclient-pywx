@@ -25,6 +25,7 @@ ID_MENU = 10042
 ID_OPEN = 10043
 ID_UNIV = 10044
 ID_TURN = 10045
+ID_SAVE = 10046
 ID_EXIT = 10049
 ID_FILE = 10050
 
@@ -255,9 +256,20 @@ class winMain(winBase):
 		file.Append( ID_UNIV, _("Download the &Universe\tCtrl-U"), _("Download the Universe") )
 		file.Append( ID_TURN, _("Request End of &Turn\tCtrl-T"),   _("Send a message to the server requesting the turn end soon.") )
 		file.AppendSeparator()
+                file.Append( ID_SAVE, _("&Save the Game\tCtrl-S"),         _("Save the state of the Game to a savefile.") )
+                file.AppendSeparator()
 		file.Append( wx.ID_PREFERENCES, _("&Preferences"), _("Configure the Client") )
 		file.AppendSeparator()
 		file.Append( ID_EXIT, _("Exit"), _("Exit") )
+
+                try:
+                        # Enable/Disable save in file menu
+                        if self.application.game.active and self.application.game.sparams['persistence'] == 'tpsqlite':
+                                file.Enable(ID_SAVE, True)
+                        else:
+                                file.Enable(ID_SAVE, False)
+                except(AttributeError):
+                        file.Enable(ID_SAVE, false)
 
 		# Windows Menu
 		win = wx.Menu()
@@ -316,6 +328,7 @@ class winMain(winBase):
 		source.Bind(wx.EVT_MENU, self.OnConnect,     id=ID_OPEN)
 		source.Bind(wx.EVT_MENU, self.UpdateCache,   id=ID_UNIV)
 		source.Bind(wx.EVT_MENU, self.RequestEOT,    id=ID_TURN)
+                source.Bind(wx.EVT_MENU, self.OnSave,        id=ID_SAVE)
 		source.Bind(wx.EVT_MENU, self.OnConfig,      id=wx.ID_PREFERENCES)
 		source.Bind(wx.EVT_MENU, self.OnProgramExit, id=ID_EXIT)
 
@@ -368,6 +381,12 @@ class winMain(winBase):
 
 	def OnConnect(self, evt):
 		self.application.gui.Show(self.application.gui.connectto)
+
+        def OnSave(self, evt):
+                saveDialog = wx.wxFileDialog(None, style = wx.wxSave|wx.wxOVERWRITE_PROMPT)
+                if saveDialog.ShowModal() == wx.wxID_OK:
+                        # save the game
+                        self.application.game.save(saveDialog.GetPath())
 
 	def OnConfig(self, evt):
 		self.application.ConfigDisplay()
