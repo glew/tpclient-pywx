@@ -10,6 +10,7 @@ import sys
 
 # wxPython imports
 import wx
+import wxPython.wx
 from wx.lib.wordwrap import wordwrap
 
 
@@ -277,6 +278,20 @@ class winMain(winBase):
                 except(AttributeError):
                         file.Enable(ID_SAVE, False)
 
+                def OnMenuFileUpdate(evt):
+                        try:
+                                # Enable/Disable save in file menu
+                                if self.application.game.active and self.application.game.sparams['persistence'] == 'tpsqlite':
+                                        file.Enable(ID_SAVE, True)
+                                else:
+                                        file.Enable(ID_SAVE, False)
+                        except(AttributeError):
+                                print "Menu: Save Exception thrown"
+                                file.Enable(ID_SAVE, False)
+                source.OnMenuFileUpdate = OnMenuFileUpdate
+
+                app.Bind(wx.EVT_UPDATE_UI, source.OnMenuFileUpdate, id=ID_SAVE)
+
 		# Windows Menu
 		win = wx.Menu()
 
@@ -376,8 +391,8 @@ class winMain(winBase):
 		self.application.gui.Show(self.application.gui.connectto)
 
         def OnSave(self, evt):
-                saveDialog = wx.wxFileDialog(None, style = wx.wxSave|wx.wxOVERWRITE_PROMPT)
-                if saveDialog.ShowModal() == wx.wxID_OK:
+                saveDialog = wx.FileDialog(None, style = wx.FD_SAVE|wx.FD_OVERWRITE_PROMPT)
+                if saveDialog.ShowModal() == wxPython.wx.wxID_OK:
                         # save the game
                         self.application.game.save(saveDialog.GetPath())
 
